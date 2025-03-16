@@ -188,7 +188,222 @@ RS1、RSO(PSW.4、PSW.3):寄存器组选择位,用软件置1或清0
     1   & 0   & 2组(10H-17H) \\ \hline
     1   & 1   & 3组(18H-1FH) \\ \hline
     \end{tabular}
-    \end{table}
+\end{table}
 OV(PSW.2):溢出标志位.
 在加法或减法运算时,如运算的结果超出8位二进制数的范围,则OV置1,标志溢出,否则OV清0.
+
+P(PSW.0):偶标志位.
+用于记录指令执行后累加器A中1的个数的奇偶.
+若累加器A中1的个数为奇数,则P置1;
+若累加器A中1的个数为偶数,则P清0
+
+\subsubsection{存储器}
+MCS51微控制器的存储器,ROM和RAM是分开寻址的
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{photos/存储器结构图.png}
+\end{figure}
+
+目前增强型的8051MCU,集成了16-64K的内部ROM,所以已不需外部扩展
+
+内部RAM:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{photos/内部RAM.png}
+\end{figure}
+对于MCS51而言,$80H\to FFH$是特殊功能寄存器区(SFR)
+
+工作寄存器区:
+
+共4组(0,1,2,3),每组都有8个字节(均叫做R0,R1...R7),通过前文提到的RS0,RS1选择某一组
+
+位寻址区:
+
+16个字节,每一位都有地址
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{photos/位寻址区.png}
+\end{figure}
+
+用户RAM区:
+
+$30H\to 7FH$是一般RAM区,也称为用户RAM区,共80字节.常常在此处开辟堆栈
+
+堆栈:
+
+有一个堆栈指针SP指向栈顶.系统复位后$SP=07H$
+
+SFR:
+
+课本以及PPT中有一个超大的表格详细介绍SFR中各个字节的作用,
+这里无法展示,下面介绍部分功能
+
+数据指针DPTR:
+
+DPTR是供用户使用的16bit的寄存器,可以按16位寄存器使用,也可拆分使用.
+DPH (高8位)+DPL(低8位)访问外部数据寄存器时做地址指针用
+
+B寄存器:B
+
+用途:用于乘除运算.
+
+例如要实现40H*41H:
+\begin{lstlisting}[language=MCS51]
+    MOV A,40H
+    MOV B,41H
+    MUL AB ;(低8位->A,高8位->B)
+\end{lstlisting}
+
+ROM:
+
+8051的内部ROM有4k,可以外扩ROM,外部ROM最大可以达到64k
+
+区分内外部ROM是通过$\bar{EA}$引脚区分:$\bar{EA}=1$为内部ROM
+
+通常用DPTR实现对片外数据存储器64KB空间的访问.
+要访问哪个单元,就把相应单元地址放DPTR,
+然后通过 DPTR 寄存器间接寻址进行访问
+
+程序存储器有一些特别区域:
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|}
+    \hline
+    00H$\to$02H & PC指针复位处     \\ \hline
+    03H$\to$0AH & 外部中断0中断地址区  \\ \hline
+    0BH$\to$12H & 定时器/计数器0中断区 \\ \hline
+    13H$\to$1AH & 外部中断1中断地址区  \\ \hline
+    1BH$\to$22H & 定时器/计数器1中断区 \\ \hline
+    23H$\to$2AH & 串行中断地址区     \\ \hline
+    \end{tabular}
+\end{table}
+
+\section{引脚}
+
+8051共40个引脚:
+
+电源接地2条
+
+时钟电路2条
+
+控制线4条
+
+I/O口$8\times 4 = 32$条
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{photos/8051引脚图.png}
+\end{figure}
+\subsection{电源引脚}
+VCC(Pin40):正电源引脚.正电源接$4.0\to 5.0V$电压,正常工作电压为$+5V$
+
+GND(Pin20):接地引脚
+
+\subsection{时钟引脚}
+XTAL1(Pin19):用作片内振荡电路的输入端
+
+XTAL2(Pin18):用作片内振荡电路的输出端或者外部时钟源的输入引脚
+
+振荡周期:Tc = 晶振频率fosc(或外加频率)的倒数
+
+状态周期:Ts = 2个振荡周期(Tc)(很少用到此概念)
+
+机器周期:Tm = 6个状态周期(Ts) = 12个振荡周期(Tc)
+
+指令周期:Ti:执行一条指令所需的机器周期(Tm)数
+
+1个机器周期 = 12个振荡周期
+
+1个指令周期 = 1、2、4个机器周期
+
+\subsection{控制引脚}
+\subsubsection{复位引脚}
+RST管脚上高电平持续时间大于2个机器周期,使单片机进入某种确定的初始状态:
+
+退出处于节电工作方式的停顿状态、退出一切程序进程、退出程序的死循环,从头开始;
+
+PC值归零(0000H);
+
+各个SFR被赋予初始值:
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+    \hline
+    特殊功能寄存器 & 初始态       & 特殊功能寄存器 & 初始态       \\ \hline
+    ACC     & 00H       & B       & 00H       \\ \hline
+    PSW     & 00H       & SP      & 07H       \\ \hline
+    DPH     & 00H       & TH0     & 00H       \\ \hline
+    DPL     & 00H       & TL0     & 00H       \\ \hline
+    IP      & xxx00000B & TH1     & 00H       \\ \hline
+    IE      & 0xx00000B & TL1     & 00H       \\ \hline
+    TMOD    & 00H       & TCON    & 00H       \\ \hline
+    SCON    & xxxxxxxxB & SBUF    & 00H       \\ \hline
+    P0-P3   & 11111111B & PCON    & 0xxxxxxxB \\ \hline
+    \end{tabular}
+\end{table}
+堆栈指针SP要额外处理,因为07H是工作寄存器区域
+
+\subsubsection{ALE/PROG}
+ALE/PROG引脚(Pin30)具有两种功能,可以作为地址锁存使能端(Address LatchEnable)和编程脉冲输入端
+
+当作为地址锁存使能端时为ALE.
+当微控制器访问外部存储器时,地址锁存允许信号输出端.有效时输出一个高脉冲.
+ALE(地址锁存)的负跳变将低8位地址打入锁存.以实现P0口的8位数据线和低8位地址线的分时复用和隔离
+
+当微控制器在非访问内部程序存储器时,ALE引脚将有一个1/6振荡频率的正脉冲信号输出,该信号可以用于外部计数或电路其他部分的时钟信号
+
+\subsubsection{PSEN}
+PSEN引脚(Pin29)是微控制器访问外部程序存储器的读选通信号(输出),低电平有效
+
+\subsubsection{EA/VPP}
+EA/VPP引脚(Pin31)具有两种功能,访问内部或外部程序存储器选择信号和提供编程电压
+
+EA:控制访问内外部ROM前文已述,这里不再赘述
+
+VPP:对于片内含有 EPROM 的机型,在编程期间,此引脚用作21V编程电源$V_{pp}$的输入端
+
+\subsection{P0口}
+P0端口具有两个功能,既可以用作双向数据总线口,也可以分时复用输出低8位地址总线
+
+P0做I/O口时必须要接上拉电阻
+
+P0口做普通IO输入时,先拉高再读
+
+\subsection{P1口}
+P1端口一般只用作通用I/O端口
+
+内置了上拉电阻
+
+输出时一切照常,仅在作输入口用时要先对其写1
+
+\subsection{P2口}
+P2端口可以用作8位通用I/O端口,或者在扩展外部存储器时用作高8位地址线
+
+\subsection{P3口}
+P3端口可以用作通用I/O端口,同时还具有特定的第二功能
+
+P3优先作为第二功能使用
+
+P3口作为第二功能使用时,需要先向P3口写入1
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+    \hline
+    I/O引脚 & 第二功能引脚名称 & 说明                \\ \hline
+    P3.0  & RXD      & 串行通信的数据接收端口       \\ \hline
+    P3.1  & TXD      & 串行通信的数据发送端口       \\ \hline
+    P3.2  & INT0     & 外部中断0的请求端口        \\ \hline
+    P3.3  & INT1     & 外部中断1的请求端口        \\ \hline
+    P3.4  & T0       & 定时/计数器0的外部事件计数输入端 \\ \hline
+    P3.5  & T1       & 定时/计数器1的外部事件计数输入端 \\ \hline
+    P3.6  & RD       & 外部数据存储单元的写选通信号    \\ \hline
+    P3.7  & WR       & 外部数据存储单元的读选通信号    \\ \hline
+    \end{tabular}
+\end{table}
+
+
+最小系统包括：
+电源,
+时钟电路,
+复位电路,
+$\bar{EA}$管脚设置:有内部rom,则接高电平
 \end{document}
